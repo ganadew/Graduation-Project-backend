@@ -1,120 +1,170 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { FaceMesh } from "@mediapipe/face_mesh";
 
 type Opts = {
-  video: HTMLVideoElement | null;        // 처리할 <video>
-  onBlink: () => void;                   // 깜빡임 발생 시 콜백
-  closeThresh?: number;                  // EAR 감음 임계값
-  openThresh?: number;                   // EAR 개안 임계값
-  minCloseMs?: number;                   // 최소 감은 시간(ms)
-  fps?: number;                          // 처리 프레임 (기본 15)
-  onMetrics?: (ear: number, closed: boolean) => void; // 디버그
+  video: HTMLVideoElement | null;
+  onBlink: () => void;
+  closeThresh?: number;
+  openThresh?: number;
+  minCloseMs?: number;
+  fps?: number;
+  onMetrics?: (ear: number, closed: boolean) => void;
 };
 
 export function useBlinkDetector({
   video,
   onBlink,
-  closeThresh = 0.20,
-  openThresh = 0.25,
+  closeThresh = 0.22,
+  openThresh = 0.30,
   minCloseMs = 120,
   fps = 15,
   onMetrics,
 }: Opts) {
+  // 최신 콜백/옵션을 ref로 유지
+  const onBlinkRef = useRef(onBlink);
+  const onMetricsRef = useRef(onMetrics);
+  const closeRef = useRef(closeThresh);
+  const openRef = useRef(openThresh);
+  const minCloseRef = useRef(minCloseMs);
+  const fpsRef = useRef(fps);
+
+  useEffect(() => { onBlinkRef.current = onBlink; }, [onBlink]);
+  useEffect(() => { onMetricsRef.current = onMetrics; }, [onMetrics]);
+  useEffect(() => { closeRef.current = closeThresh; }, [closeThresh]);
+  useEffect(() => { openRef.current = openThresh; }, [openThresh]);
+  useEffect(() => { minCloseRef.current = minCloseMs; }, [minCloseMs]);
+  useEffect(() => { fpsRef.current = fps; }, [fps]);
+
   useEffect(() => {
     if (!video) return;
 
     let stopped = false;
-    let rafId: number | null = null;
     let stream: MediaStream | null = null;
+    let mesh: FaceMesh | null = null;
+    let isClosed = false;
+    let closedAt = 0;
+    let rafId: number | null = null;
+    let rVFCId: number | null = null;
+    let lastTs = 0;
 
-    const setup = async () => {
-      // 1) 카메라 스트림 직접 열기 (안정화)
+    // 비디오 안전 플래그
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("autoplay", "true");
+    (video as HTMLVideoElement).muted = true;
+
+    const dist = (a: any, b: any) => Math.hypot(a.x - b.x, a.y - b.y);
+    const earOf = (lm: any[], idx: number[]) => {
+      const v1 = dist(lm[idx[1]], lm[idx[5]]);
+      const v2 = dist(lm[idx[2]], lm[idx[4]]);
+      const h  = dist(lm[idx[0]], lm[idx[3]]);
+      return (v1 + v2) / (2 * h);
+    };
+
+    const onResults = (res: any) => {
+      if (stopped) return;
+      const lm = res.multiFaceLandmarks?.[0];
+      if (!lm) return;
+
+      const LEFT  = [33,160,158,133,153,144];
+      const RIGHT = [263,387,385,362,380,373];
+
+      const earL = earOf(lm, LEFT);
+      const earR = earOf(lm, RIGHT);
+      const ear  = (earL + earR) / 2;
+
+      const closeT = closeRef.current;
+      const openT  = openRef.current;
+
+      onMetricsRef.current?.(ear, isClosed || ear < closeT);
+
+      if (!isClosed && ear < closeT) {
+        isClosed = true;
+        closedAt = performance.now();
+      } else if (isClosed && ear >= openT) {
+        const dur = performance.now() - closedAt;
+        if (dur >= minCloseRef.current) onBlinkRef.current?.();
+        isClosed = false;
+      }
+    };
+
+    const stepRAF = async (ts: number) => {
+      if (stopped) return;
+      const budget = 1000 / (fpsRef.current || 15);
+      if (!lastTs || ts - lastTs >= budget) {
+        lastTs = ts;
+        if (video.readyState >= 2 && mesh) await mesh.send({ image: video });
+      }
+      rafId = requestAnimationFrame(stepRAF);
+    };
+
+    const stepRVFC = async (_now: number, _meta: any) => {
+      if (stopped) return;
+      const now = performance.now();
+      const budget = 1000 / (fpsRef.current || 15);
+      if (!lastTs || now - lastTs >= budget) {
+        lastTs = now;
+        if (video.readyState >= 2 && mesh) await mesh.send({ image: video });
+      }
+      rVFCId = (video as any).requestVideoFrameCallback(stepRVFC);
+    };
+
+    const start = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: "user",
-          },
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user", frameRate: { ideal: 30, max: 30 } },
           audio: false,
         });
         video.srcObject = stream;
-        // iOS 등 자동재생 대비
         await video.play().catch(() => {});
-        console.log("[blink] camera started (getUserMedia)");
+        mesh = new FaceMesh({
+          locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`,
+        });
+        mesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.6,
+        });
+        mesh.onResults(onResults);
+
+        if ("requestVideoFrameCallback" in video) {
+          rVFCId = (video as any).requestVideoFrameCallback(stepRVFC);
+        } else {
+          rafId = requestAnimationFrame(stepRAF);
+        }
       } catch (e) {
-        console.error("[blink] getUserMedia failed:", e);
-        return;
+        console.error("[blink] setup failed:", e);
       }
-
-      // 2) FaceMesh 초기화
-      const faceMesh = new FaceMesh({
-        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`,
-      });
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6,
-      });
-
-      let isBlinking = false;
-      let closedAt = 0;
-
-      const dist = (a: any, b: any) => Math.hypot(a.x - b.x, a.y - b.y);
-      const earOf = (lm: any[], idx: number[]) => {
-        const v1 = dist(lm[idx[1]], lm[idx[5]]);
-        const v2 = dist(lm[idx[2]], lm[idx[4]]);
-        const h  = dist(lm[idx[0]], lm[idx[3]]);
-        return (v1 + v2) / (2 * h);
-      };
-
-      faceMesh.onResults((res: any) => {
-        const lm = res.multiFaceLandmarks?.[0];
-        if (!lm) return;
-
-        const LEFT  = [33,160,158,133,153,144];
-        const RIGHT = [263,387,385,362,380,373];
-
-        const earL = earOf(lm, LEFT);
-        const earR = earOf(lm, RIGHT);
-        const ear  = (earL + earR) / 2;
-
-        onMetrics?.(ear, isBlinking || ear < closeThresh);
-
-        if (ear < closeThresh && !isBlinking) {
-          isBlinking = true;
-          closedAt = performance.now();
-        } else if (ear >= openThresh && isBlinking) {
-          const dur = performance.now() - closedAt;
-          if (dur >= minCloseMs) onBlink();
-          isBlinking = false;
-        }
-      });
-
-      // 3) rAF 루프 (fps 제한)
-      let last = 0;
-      const loop = async (ts: number) => {
-        if (stopped) return;
-        if (ts - last >= 1000 / fps) {
-          last = ts;
-          if (video.readyState >= 2) {
-            await faceMesh.send({ image: video });
-          }
-        }
-        rafId = requestAnimationFrame(loop);
-      };
-      rafId = requestAnimationFrame(loop);
     };
 
-    setup();
+    const onVis = () => {
+      if (document.hidden) {
+        if (rafId) cancelAnimationFrame(rafId), (rafId = null);
+        if (rVFCId && "cancelVideoFrameCallback" in (video as any)) {
+          (video as any).cancelVideoFrameCallback(rVFCId); rVFCId = null;
+        }
+      } else {
+        lastTs = 0;
+        if ("requestVideoFrameCallback" in video) {
+          rVFCId = (video as any).requestVideoFrameCallback(stepRVFC);
+        } else {
+          rafId = requestAnimationFrame(stepRAF);
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVis);
+    start();
 
     return () => {
       stopped = true;
+      document.removeEventListener("visibilitychange", onVis);
       if (rafId) cancelAnimationFrame(rafId);
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
+      if (rVFCId && "cancelVideoFrameCallback" in (video as any)) {
+        (video as any).cancelVideoFrameCallback(rVFCId);
       }
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      mesh = null;
     };
-  }, [video, onBlink, closeThresh, openThresh, minCloseMs, fps, onMetrics]);
+  }, [video]);
 }
