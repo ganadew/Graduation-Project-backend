@@ -121,7 +121,7 @@
 .grid-menu-container {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 30px;
+  gap: 48px;           /* 간격을 더 띄움 */
   padding: 40px;
   max-width: 1000px;
   width: 90%;
@@ -132,13 +132,13 @@
   color: #3b4290;
   border: 2px solid transparent;
   border-radius: 24px;
-  padding: 20px;
-  font-size: 1.6rem;
+  padding: 14px;       /* 크기 추가 축소 */
+  font-size: 1.3rem;   /* 글자 크기 추가 축소 */
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   transition: all 0.2s ease;
-  height: 160px;
+  height: 120px;       /* 버튼 높이 더 줄임 */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -150,4 +150,57 @@
   background-color: #f8f9ff;
   transform: translateY(-5px);
   box-shadow: 0 10px 25px rgba(59, 66, 144, 0.2);
+}
+
+/* 이전 화면 버튼 */
+.menu-with-back {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  position: relative;
+  padding-top: 8px;
+}
+
+.back-btn {
+  /* 카메라(#webgazerVideoFeed: 320x240, top 20px) 아래에 배치 */
+  position: fixed;
+  top: 320px;
+  left: 20px;
+  background: white;
+  color: #3b4290;
+  border: 1px solid #d9dcf2;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 150; /* 카메라보다 위, 기타 요소보다 살짝 위 */
+}
+
+.back-btn:hover {
+  border-color: #3b4290;
+  background: #f8f9ff;
+}
+
+/* 캘리브레이션 다시하기 버튼 */
+.recalibrate-btn {
+  position: fixed;
+  top: 370px;
+  left: 20px;
+  background: white;
+  color: #3b4290;
+  border: 1px solid #d9dcf2;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 150;
+}
+
+.recalibrate-btn:hover {
+  border-color: #3b4290;
+  background: #f8f9ff;
 }

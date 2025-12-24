@@ -5,7 +5,9 @@ const EyeController = ({ onGazeChange, onBlink, onEarChange }) => {
   // ★ "Long Blink"를 위한 타이머 변수들
   const blinkStartTime = useRef(null); // 눈을 감기 시작한 시간
   const hasTriggered = useRef(false);  // 이미 클릭이 발동했는지 체크
-  const BLINK_DP_THRESHOLD = 800;      // 0.8초 이상 감아야 인정 (조절 가능)
+  // 깜빡임 감도: EAR이 임계값 미만으로 유지되는 최소 시간(ms)
+  const BLINK_EAR_THRESHOLD = 0.32;
+  const BLINK_DP_THRESHOLD = 350;      // 0.35초 이상 감으면 클릭 처리 (짧게 조정)
 
   // 부모 함수 최신화 (Stale Closure 방지)
   const latestOnBlink = useRef(onBlink);
@@ -47,8 +49,8 @@ const EyeController = ({ onGazeChange, onBlink, onEarChange }) => {
 
       // ★★★ 핵심 로직 수정: 롱 블링크 (Long Blink) 감지 ★★★
       
-      // 1. 눈을 감았다고 판단되면 (0.3 미만)
-      if (avgEAR < 0.3) {
+      // 1. 눈을 감았다고 판단되면 (임계값 미만)
+      if (avgEAR < BLINK_EAR_THRESHOLD) {
         // 타이머 시작 (처음 감았을 때만 기록)
         if (blinkStartTime.current === null) {
           blinkStartTime.current = Date.now();
