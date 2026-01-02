@@ -1,0 +1,105 @@
+.radial-root {
+  position: relative;
+  width: 520px;
+  height: 380px;
+}
+
+.radial-center {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  padding: 0;
+  border: 2px dashed rgba(59, 130, 246, 0.7);
+  background: radial-gradient(circle at 30% 20%, #e0f2fe, #bfdbfe);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease,
+    border-color 0.25s ease, background 0.25s ease;
+  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.18);
+}
+
+.radial-center-inner {
+  width: 90px;
+  height: 90px;
+  border-radius: 999px;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radial-center-icon {
+  font-size: 40px;
+}
+
+.radial-center.open {
+  transform: translate(-50%, -50%) scale(1.05);
+  border-style: solid;
+  border-color: rgba(59, 130, 246, 0.9);
+}
+
+.radial-item {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%) scale(0.5);
+  opacity: 0;
+  width: 180px;
+  height: 96px;
+  border-radius: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.96);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  transition: transform 0.28s ease, opacity 0.22s ease,
+    box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.radial-item.open {
+  opacity: 1;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translate(180px)
+    rotate(calc(-1 * var(--angle)))
+    scale(1);
+}
+
+.radial-item:hover {
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+  border-color: rgba(59, 130, 246, 0.7);
+}
+
+.radial-item.open.selected {
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translate(180px)
+    rotate(calc(-1 * var(--angle)))
+    scale(1.08);
+  border: 2px solid rgba(147, 197, 253, 0.8);
+  box-shadow: 0 20px 50px rgba(59, 130, 246, 0.4),
+              0 0 0 2px rgba(147, 197, 253, 0.3);
+}
+
+.radial-item-label {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.radial-item-sub {
+  font-size: 13px;
+  color: #6b7280;
+}
