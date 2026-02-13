@@ -3,7 +3,7 @@ from sqlalchemy.sql import func # 현재 시간을 가져오기 위해 필요합
 from database import Base
 
 class User(Base):
-    __tablename__ = "user"
+    __tablename__ = "users"
     ID = Column(Integer, primary_key=True, index=True)
     email = Column(String(100), nullable=False)
     password = Column(String(255), nullable=False)
@@ -15,7 +15,7 @@ class Album(Base):
     __tablename__ = "albums"
     ID = Column(Integer, primary_key=True, index=True)
     title = Column(String(100), nullable=False)
-    patient_id = Column(Integer, ForeignKey("user.ID"))
+    patient_id = Column(Integer, ForeignKey("users.ID"))
     # 2. 앨범 생성 시간 추가
     created_at = Column(DateTime, server_default=func.now())
 
@@ -26,6 +26,33 @@ class Media(Base):
     s3_url = Column(String(255), nullable=False) # 저장 경로
     description = Column(Text, nullable=True)
     album_id = Column(Integer, ForeignKey("albums.ID"))
-    uploader_id = Column(Integer, ForeignKey("user.ID"))
+    uploader_id = Column(Integer, ForeignKey("users.ID"))
     # 3. 미디어 업로드 시간 (이미 있던 부분)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class Medication(Base):
+    __tablename__ = "medications"
+    ID = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.ID"), nullable=False)
+    name = Column(String(100), nullable=False)
+    dose = Column(String(100), nullable=False)  # 용량 정보 (예: "1알", "10mg")
+    image_url = Column(String(255), nullable=True)  # 약 사진 경로 (옵션)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class MedicationSchedule(Base):
+    __tablename__ = "medication_schedules"
+    ID = Column(Integer, primary_key=True, index=True)
+    medication_id = Column(Integer, ForeignKey("medications.ID"), nullable=False)
+    weekday = Column(Integer, nullable=False)  # 0~6 (예: 0=월, 6=일) 또는 0=일
+    time = Column(String(5), nullable=False)  # "HH:MM" 형식 문자열
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class MedicationLog(Base):
+    __tablename__ = "medication_logs"
+    ID = Column(Integer, primary_key=True, index=True)
+    medication_id = Column(Integer, ForeignKey("medications.ID"), nullable=False)
+    schedule_id = Column(Integer, ForeignKey("medication_schedules.ID"), nullable=False)
+    taken_time = Column(DateTime, server_default=func.now())
