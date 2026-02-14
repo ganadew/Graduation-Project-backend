@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
-from sqlalchemy.sql import func # 현재 시간을 가져오기 위해 필요합니다
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Date, Boolean, Float
+from sqlalchemy.sql import func  # 현재 시간을 가져오기 위해 필요합니다
 from database import Base
 
 class User(Base):
@@ -56,3 +56,28 @@ class MedicationLog(Base):
     medication_id = Column(Integer, ForeignKey("medications.ID"), nullable=False)
     schedule_id = Column(Integer, ForeignKey("medication_schedules.ID"), nullable=False)
     taken_time = Column(DateTime, server_default=func.now())
+
+
+class NotificationSetting(Base):
+    """알림 설정 (유저당 1개)"""
+    __tablename__ = "notification_settings"
+    ID = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.ID"), nullable=False, unique=True)
+    display_mode = Column(String(20), nullable=True)   # 예: "full", "compact"
+    sound_type = Column(String(20), nullable=True)    # 예: "default", "custom"
+    sound_volume = Column(Integer, nullable=True)     # 0~100
+    photo_enabled = Column(Boolean, default=False)
+    photo_url = Column(String(255), nullable=True)    # 알림용 사진 URL
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class Notification(Base):
+    """스케줄 기준 생성되는 알림 (복약 알림)"""
+    __tablename__ = "notifications"
+    ID = Column(Integer, primary_key=True, index=True)
+    schedule_id = Column(Integer, ForeignKey("medication_schedules.ID"), nullable=False)
+    target_date = Column(Date, nullable=False)        # 알림 대상 날짜
+    status = Column(Integer, nullable=False, default=0)  # 0=대기, 1=완료, 2=스킵
+    confirmed_at = Column(DateTime, nullable=True)    # 완료/스킵 시각
+    created_at = Column(DateTime, server_default=func.now())
