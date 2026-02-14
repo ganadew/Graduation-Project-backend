@@ -18,7 +18,7 @@ class ProtectorRelation(Base):
     ID = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"))
     protector_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"))
-    relation_name = Column(String(50))
+    relation_type = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Album(Base):
