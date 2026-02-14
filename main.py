@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from controller import items,users,media
 from typing import Union
 
-models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
 app.include_router(items.router)

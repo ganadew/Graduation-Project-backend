@@ -10,6 +10,16 @@ class User(Base):
     password = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+    
+
+class ProtectorRelation(Base):
+    __tablename__ = "protector_relations"
+
+    ID = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"))
+    protector_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"))
+    relation_name = Column(String(50))
+    created_at = Column(DateTime, server_default=func.now())
 
 class Album(Base):
     __tablename__ = "albums"
