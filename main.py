@@ -1,15 +1,12 @@
 import models
 from database import engine
 from fastapi import FastAPI
-from controller import items,users,media
-from typing import Union
+from controller import users
 
 
 app = FastAPI()
 
-app.include_router(items.router)
 app.include_router(users.router)
-app.include_router(media.router)
 
 @app.get("/")
 def read_root():
