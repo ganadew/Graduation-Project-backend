@@ -81,3 +81,18 @@ class Notification(Base):
     status = Column(Integer, nullable=False, default=0)  # 0=대기, 1=완료, 2=스킵
     confirmed_at = Column(DateTime, nullable=True)    # 완료/스킵 시각
     created_at = Column(DateTime, server_default=func.now())
+
+class Meal(Base):
+    __tablename__ = "meals"
+    
+    ID = Column(Integer, primary_key=True, index=True)
+    
+    # patient_settings 테이블 참조
+    patient_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"), nullable=False)
+    
+    meal_type = Column(String(20), nullable=False)      # 아침/점심/저녁/간식
+    food_items = Column(Text, nullable=False)           # 음식 목록
+    memo = Column(Text, nullable=True)                  # 메모
+    image_url = Column(String(255), nullable=True)      # 사진 URL
+    meal_date = Column(DateTime, nullable=False)        # 식사 날짜/시간
+    created_at = Column(DateTime, server_default=func.now())
