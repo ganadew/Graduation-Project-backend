@@ -14,6 +14,48 @@ router = APIRouter(prefix="/media", tags=["media"])
 UPLOAD_DIR = "./static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# --- 공유앨범 생성 API (ERD 기준 수정본) ---
+
+from pydantic import BaseModel
+
+class SharedAlbumCreate(BaseModel):
+    title: str
+    patient_id: int
+
+
+@router.post("/shared-albums")
+def create_shared_album(data: SharedAlbumCreate, db: Session = Depends(get_db)):
+
+    # 1️⃣ 환자 존재 확인
+    patient = db.query(models.User)\
+        .filter(models.User.ID == data.patient_id)\
+        .first()
+
+    if not patient:
+        raise HTTPException(status_code=404, detail="해당 환자를 찾을 수 없습니다.")
+
+    # 2️⃣ 환자(role = 0) 인지 확인
+    if patient.role != 0:
+        raise HTTPException(status_code=400, detail="공유앨범은 환자 계정만 생성할 수 있습니다.")
+
+    # 3️⃣ 앨범 생성 (created_at은 DB에서 자동 생성)
+    new_album = models.Album(
+        title=data.title,
+        patient_id=data.patient_id
+    )
+
+    db.add(new_album)
+    db.commit()
+    db.refresh(new_album)
+
+    return {
+        "message": "공유앨범 생성 성공",
+        "album_id": new_album.ID,
+        "title": new_album.title,
+        "patient_id": new_album.patient_id
+    }
+
+
 # --- 1. 앨범 목록 조회 (추가됨) ---
 @router.get("/albums")
 def get_album_list(patient_id: int, db: Session = Depends(get_db)):
