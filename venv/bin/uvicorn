@@ -1,8 +1,6 @@
-#!/Users/haeunkim/Downloads/Graduation-Project-backend-media_0204/venv/bin/python3.13
-# -*- coding: utf-8 -*-
-import re
+#!/Users/ysy/Graduation-Project-backend/venv/bin/python3.14
 import sys
 from uvicorn.main import main
 if __name__ == '__main__':
-    sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
     sys.exit(main())

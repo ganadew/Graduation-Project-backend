@@ -86,9 +86,7 @@ class Meal(Base):
     __tablename__ = "meals"
     
     ID = Column(Integer, primary_key=True, index=True)
-    
-    # patient_settings 테이블 참조
-    patient_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"), nullable=False)
     
     meal_type = Column(String(20), nullable=False)      # 아침/점심/저녁/간식
     food_items = Column(Text, nullable=False)           # 음식 목록

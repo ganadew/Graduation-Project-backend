@@ -1,15 +1,2 @@
 # Created by venv; see https://docs.python.org/3/library/venv.html
-
-# 보안: 비밀번호 파일 무시
-.env
-
-# 가상환경 무시
-venv/
-.venv/
-
-# 파이썬 실행 찌꺼기 무시
-__pycache__/
-*.py[cod]
-
-# 시스템 파일
-.DS_Store
+*
