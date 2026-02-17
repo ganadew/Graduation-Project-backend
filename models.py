@@ -8,7 +8,7 @@ class User(Base):
     ID = Column(Integer, primary_key=True, index=True)
     email = Column(String(100), nullable=False)
     password = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False)
+    role = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now())
     
 
