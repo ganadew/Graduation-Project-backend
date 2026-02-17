@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { FaceMesh } from '@mediapipe/face_mesh';
 
-const EyeController = ({ onGazeChange, onBlink, onEarChange }) => {
+const EyeController = ({ onGazeChange, onBlink, onEarChange, onLandmarksChange }) => {
   // ★ "Long Blink"를 위한 타이머 변수들
   const blinkStartTime = useRef(null); // 눈을 감기 시작한 시간
   const hasTriggered = useRef(false);  // 이미 클릭이 발동했는지 체크
@@ -11,10 +11,12 @@ const EyeController = ({ onGazeChange, onBlink, onEarChange }) => {
   const latestOnBlink = useRef(onBlink);
   const latestOnGazeChange = useRef(onGazeChange);
   const latestOnEarChange = useRef(onEarChange);
+  const latestOnLandmarksChange = useRef(onLandmarksChange);
 
   useEffect(() => { latestOnBlink.current = onBlink; }, [onBlink]);
   useEffect(() => { latestOnGazeChange.current = onGazeChange; }, [onGazeChange]);
   useEffect(() => { latestOnEarChange.current = onEarChange; }, [onEarChange]);
+  useEffect(() => { latestOnLandmarksChange.current = onLandmarksChange; }, [onLandmarksChange]);
 
   const calculateEAR = (landmarks, eyeIndices) => {
     const distance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
@@ -34,6 +36,8 @@ const EyeController = ({ onGazeChange, onBlink, onEarChange }) => {
     faceMesh.onResults((results) => {
       if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
       const landmarks = results.multiFaceLandmarks[0];
+      
+      if (latestOnLandmarksChange.current) latestOnLandmarksChange.current(landmarks);
       
       const LEFT_EYE = [33, 160, 158, 133, 153, 144];
       const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
@@ -73,6 +77,7 @@ const EyeController = ({ onGazeChange, onBlink, onEarChange }) => {
         hasTriggered.current = false;
       }
     });
+    
 
     const setupWebGazer = async () => {
       if (window.webgazer) {

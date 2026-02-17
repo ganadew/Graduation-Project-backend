@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import EyeController from './components/EyeController';
 import Calibration from './components/Calibration';
+import GameCalibration3D from './components/GameCalibration3D';
+
 import './App.css';
 
 function App() {
   const [gaze, setGaze] = useState({ x: 0, y: 0 });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hoveredButton, setHoveredButton] = useState(null);
+  const [landmarks, setLandmarks] = useState(null);
+
   
   // EAR 값을 저장할 상태
   const [currentEAR, setCurrentEAR] = useState(0);
@@ -77,6 +81,7 @@ function App() {
         onGazeChange={setGaze} 
         onBlink={handleBlink} 
         onEarChange={setCurrentEAR} 
+        onLandmarksChange={setLandmarks}
       />
 
       <div className="gaze-point" style={{ left: gaze.x, top: gaze.y }} />
