@@ -1,16 +1,22 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
 
-# 개발·테스트용으로 SQLite 사용
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+# .env 로드
+load_dotenv()
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
+# 환경변수에서 DB URL 가져오기
+DB_URL = os.getenv("DB_URL")
+
+engine = create_engine(DB_URL)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
 )
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 

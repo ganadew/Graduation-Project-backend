@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Date, Boolean, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Date, Boolean, Float, DECIMAL
 from sqlalchemy.sql import func  # 현재 시간을 가져오기 위해 필요합니다
 from database import Base
+from sqlalchemy.orm import relationship
 
 class User(Base):
     __tablename__ = "users"
@@ -84,13 +85,34 @@ class Notification(Base):
 
 class Meal(Base):
     __tablename__ = "meals"
-    
+
     ID = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"), nullable=False)
-    
-    meal_type = Column(String(20), nullable=False)      # 아침/점심/저녁/간식
-    food_items = Column(Text, nullable=False)           # 음식 목록
-    memo = Column(Text, nullable=True)                  # 메모
-    image_url = Column(String(255), nullable=True)      # 사진 URL
-    meal_date = Column(DateTime, nullable=False)        # 식사 날짜/시간
+    uploader_ID = Column(Integer, ForeignKey("users.ID", ondelete="CASCADE"), nullable=False)
+
+    meal_type = Column(Integer, nullable=False)        # ✅ 0/1/2/3
+    memo = Column(Text, nullable=True)
+    image_url = Column(String(255), nullable=True)
+    meal_date = Column(DateTime, nullable=False)       # ✅ DATETIME
     created_at = Column(DateTime, server_default=func.now())
+
+    # ✅ 1:N 관계
+    items = relationship(
+        "MealItem",
+        back_populates="meal",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class MealItem(Base):
+    __tablename__ = "meal_items"
+
+    ID = Column(Integer, primary_key=True, index=True)
+    meal_ID = Column(Integer, ForeignKey("meals.ID", ondelete="CASCADE"), nullable=False)
+
+    name = Column(String(255), nullable=False)
+    qty = Column(DECIMAL(6, 2), nullable=True)  # ✅ 너가 OK한 DECIMAL(6,2)
+    unit = Column(String(50), nullable=True)
+    memo = Column(Text, nullable=True)
+
+    meal = relationship("Meal", back_populates="items")
