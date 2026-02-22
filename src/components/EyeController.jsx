@@ -1,113 +1,172 @@
 import React, { useEffect, useRef } from 'react';
 import { FaceMesh } from '@mediapipe/face_mesh';
 
+/**
+ * EyeController
+ * - WebGazer로 시선(gaze) 추적
+ * - MediaPipe FaceMesh로 EAR 계산 & Long Blink 감지
+ * - FaceMesh 인스턴스는 이 컴포넌트 하나에서만 관리 (MediaPipeFaceDetector.jsx는 삭제하거나 사용하지 마세요)
+ */
 const EyeController = ({ onGazeChange, onBlink, onEarChange }) => {
-  // ★ "Long Blink"를 위한 타이머 변수들
-  const blinkStartTime = useRef(null); // 눈을 감기 시작한 시간
-  const hasTriggered = useRef(false);  // 이미 클릭이 발동했는지 체크
-  const BLINK_DP_THRESHOLD = 800;      // 0.8초 이상 감아야 인정 (조절 가능)
+  const BLINK_EAR_THRESHOLD = 0.20;
+  const BLINK_DURATION_THRESHOLD = 350; // ms
 
-  // 부모 함수 최신화 (Stale Closure 방지)
+  const blinkStartTime = useRef(null);
+  const hasTriggered = useRef(false);
+  const animFrameRef = useRef(null);
+  const faceMeshRef = useRef(null);
+
+  // Stale Closure 방지
   const latestOnBlink = useRef(onBlink);
   const latestOnGazeChange = useRef(onGazeChange);
   const latestOnEarChange = useRef(onEarChange);
-
   useEffect(() => { latestOnBlink.current = onBlink; }, [onBlink]);
   useEffect(() => { latestOnGazeChange.current = onGazeChange; }, [onGazeChange]);
   useEffect(() => { latestOnEarChange.current = onEarChange; }, [onEarChange]);
 
-  const calculateEAR = (landmarks, eyeIndices) => {
-    const distance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
-    const v1 = distance(landmarks[eyeIndices[1]], landmarks[eyeIndices[5]]);
-    const v2 = distance(landmarks[eyeIndices[2]], landmarks[eyeIndices[4]]);
-    const h = distance(landmarks[eyeIndices[0]], landmarks[eyeIndices[3]]);
-    return (v1 + v2) / (2.0 * h);
+  const calculateEAR = (landmarks, idx) => {
+    const d = (a, b) => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+    const v1 = d(landmarks[idx[1]], landmarks[idx[5]]);
+    const v2 = d(landmarks[idx[2]], landmarks[idx[4]]);
+    const h  = d(landmarks[idx[0]], landmarks[idx[3]]);
+    return h === 0 ? 0 : (v1 + v2) / (2.0 * h);
   };
 
   useEffect(() => {
-    const faceMesh = new FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-    });
-    
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    let cancelled = false;
 
-    faceMesh.onResults((results) => {
-      if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
-      const landmarks = results.multiFaceLandmarks[0];
-      
-      const LEFT_EYE = [33, 160, 158, 133, 153, 144];
-      const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
-      
-      const leftEAR = calculateEAR(landmarks, LEFT_EYE);
-      const rightEAR = calculateEAR(landmarks, RIGHT_EYE);
-      const avgEAR = (leftEAR + rightEAR) / 2;
+    const setup = async () => {
+      // ── 1. FaceMesh 초기화 ──────────────────────────────────────────
+      const faceMesh = new FaceMesh({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      });
+      faceMeshRef.current = faceMesh;
 
-      // EAR 값 화면 표시용 전달
-      if (latestOnEarChange.current) latestOnEarChange.current(avgEAR);
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
 
-      // ★★★ 핵심 로직 수정: 롱 블링크 (Long Blink) 감지 ★★★
-      
-      // 1. 눈을 감았다고 판단되면 (0.3 미만)
-      if (avgEAR < 0.3) {
-        // 타이머 시작 (처음 감았을 때만 기록)
-        if (blinkStartTime.current === null) {
-          blinkStartTime.current = Date.now();
-        } 
-        // 이미 감고 있는 중이라면 시간 체크
-        else {
-          const duration = Date.now() - blinkStartTime.current;
-          
-          // 0.8초 이상 지났고 + 아직 클릭 안 했으면 -> 실행!
-          if (duration > BLINK_DP_THRESHOLD && !hasTriggered.current) {
-            console.log("Long Blink Detected! Action Triggered.");
-            if (latestOnBlink.current) latestOnBlink.current();
-            
-            hasTriggered.current = true; // 눈 뜰 때까지 중복 실행 방지
+      faceMesh.onResults((results) => {
+        if (!results.multiFaceLandmarks?.length) {
+          latestOnEarChange.current?.(0);
+          return;
+        }
+
+        const lm = results.multiFaceLandmarks[0];
+        // 검증된 랜드마크 인덱스
+        const LEFT_EYE  = [33, 160, 158, 133, 153, 144];
+        const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
+
+        const leftEAR  = calculateEAR(lm, LEFT_EYE);
+        const rightEAR = calculateEAR(lm, RIGHT_EYE);
+        const avgEAR   = (leftEAR + rightEAR) / 2;
+
+        latestOnEarChange.current?.(avgEAR);
+
+        // ── Long Blink 감지 ──
+        if (avgEAR < BLINK_EAR_THRESHOLD) {
+          if (blinkStartTime.current === null) {
+            blinkStartTime.current = Date.now();
+            hasTriggered.current = false;
+          } else if (!hasTriggered.current) {
+            const duration = Date.now() - blinkStartTime.current;
+            if (duration >= BLINK_DURATION_THRESHOLD) {
+              console.log(`[Long Blink] duration=${duration}ms EAR=${avgEAR.toFixed(3)}`);
+              latestOnBlink.current?.();
+              hasTriggered.current = true;
+            }
+          }
+        } else {
+          blinkStartTime.current = null;
+          hasTriggered.current   = false;
+        }
+      });
+
+      // ── 2. WebGazer 초기화 ──────────────────────────────────────────
+      if (!window.webgazer) {
+        console.error('[EyeController] WebGazer not loaded');
+        return;
+      }
+
+      window.webgazer.showPredictionPoints(false);
+      window.webgazer.setGazeListener((data) => {
+        if (data) {
+          console.log('gaze:', Math.round(data.x), Math.round(data.y)); // 임시 확인용
+          latestOnGazeChange.current?.({ x: data.x, y: data.y });
+  }
+      });
+
+      try {
+        await window.webgazer.begin();
+      } catch (err) {
+        // begin()이 callback 기반이라 reject 없이 throw하기도 함 — 무시
+        console.warn('[EyeController] webgazer.begin warning:', err);
+      }
+
+      // ── 3. WebGazer 비디오 요소 대기 후 FaceMesh에 프레임 전송 ───────
+      const videoEl = await waitForVideo(30, 150); // 최대 4.5초 대기
+      if (!videoEl || cancelled) return;
+
+      console.log('[EyeController] Video ready, starting FaceMesh loop');
+
+      const sendLoop = async () => {
+        if (cancelled) return;
+        // ★ readyState 4 = HAVE_ENOUGH_DATA (기존 코드의 2는 잘못된 값)
+        if (
+          videoEl.readyState >= 2 &&   // HAVE_CURRENT_DATA 이상이면 전송
+          !videoEl.paused &&
+          !videoEl.ended
+        ) {
+          try {
+            await faceMesh.send({ image: videoEl });
+          } catch (e) {
+            console.warn('[EyeController] faceMesh.send error:', e);
           }
         }
-      } 
-      // 2. 눈을 떴으면 (0.3 이상)
-      else {
-        // 모든 변수 초기화 (다음 깜빡임 대기)
-        blinkStartTime.current = null;
-        hasTriggered.current = false;
-      }
-    });
-
-    const setupWebGazer = async () => {
-      if (window.webgazer) {
-        window.webgazer.showPredictionPoints(false); // 빨간 점 2개 뜨는 것 방지
-
-        await window.webgazer.setGazeListener((data, clock) => {
-          if (data && latestOnGazeChange.current) {
-            latestOnGazeChange.current({ x: data.x, y: data.y });
-          }
-        }).begin();
-
-        const checkVideo = setInterval(() => {
-          const videoEl = document.querySelector('#webgazerVideoFeed');
-          if (videoEl) {
-            clearInterval(checkVideo);
-            const sendToMediaPipe = async () => {
-              if (!videoEl.paused && !videoEl.ended) {
-                await faceMesh.send({ image: videoEl });
-              }
-              requestAnimationFrame(sendToMediaPipe);
-            };
-            sendToMediaPipe();
-          }
-        }, 500);
-      }
+        animFrameRef.current = requestAnimationFrame(sendLoop);
+      };
+      animFrameRef.current = requestAnimationFrame(sendLoop);
     };
 
-    setupWebGazer();
+    setup();
 
     return () => {
-      if (window.webgazer) window.webgazer.end();
+      cancelled = true;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      faceMeshRef.current?.close?.();
+      window.webgazer?.end?.();
     };
-  }, []); 
+  }, []);
 
   return null;
 };
+
+// ── 유틸: #webgazerVideoFeed 요소가 나타날 때까지 폴링 ──────────────────────
+function waitForVideo(maxTries = 30, intervalMs = 150) {
+  return new Promise((resolve) => {
+    let tries = 0;
+    const check = setInterval(() => {
+      const el = document.querySelector('#webgazerVideoFeed');
+      tries++;
+      if (el) {
+        clearInterval(check);
+        // 스트림이 충분히 로드될 때까지 추가 대기
+        if (el.readyState >= 2) {
+          resolve(el);
+        } else {
+          el.addEventListener('canplay', () => resolve(el), { once: true });
+        }
+      } else if (tries >= maxTries) {
+        clearInterval(check);
+        console.warn('[EyeController] webgazerVideoFeed not found');
+        resolve(null);
+      }
+    }, intervalMs);
+  });
+}
 
 export default EyeController;
