@@ -1,0 +1,11 @@
+# PyQt5 5.15.5는 Python 3.13에서 wheel이 없어 qmake 빌드 필요.
+# 5.15.11+ 사용 시 Python 3.13 wheel 제공.
+PyQt5>=5.15.11
+opencv-python>=4.5.5
+mediapipe>=0.8.9
+matplotlib
+pysqlite3
+numpy
+requests
+websockets
+scikit-learn

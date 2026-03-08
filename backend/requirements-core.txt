@@ -1,0 +1,5 @@
+# core_only.py 전용 (시선 추적 + WebSocket). PyQt5 제외.
+opencv-python>=4.5
+numpy
+mediapipe>=0.10
+websockets
